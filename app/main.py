@@ -2,6 +2,8 @@ from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 import os
+import gc
+from contextlib import asynccontextmanager
 
 from app.database.session import engine, Base, get_db
 from app.models.domain import JobDescription, Candidate, CandidateMatch
@@ -15,22 +17,36 @@ from fastapi.responses import FileResponse, Response
 from app.utils.export import ExportService
 from app.notifications.manager import InterviewQuestionGenerator, NotificationManager
 from app.embeddings.faiss_index import FaissSearchEngine
-import gc
-# After your models finish loading
-gc.collect()
+
+# Global model variables
+embedder = None
+faiss_engine = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Manages startup and shutdown events to keep memory usage 
+    stable during Render deployment.
+    """
+    global embedder, faiss_engine
+    # Load heavy models only after the web server starts
+    embedder = SentenceTransformer("all-MiniLM-L6-v2")
+    faiss_engine = FaissSearchEngine()
+    gc.collect()
+    yield
+    # Cleanup on shutdown
+    embedder = None
+    faiss_engine = None
 
 # Create tables on startup
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="AI-Powered Resume Screening & Candidate Ranking System",
-    description="Enterprise API for automated candidate ingestion, OCR processing, vector embeddings, and multi-factor suitability scoring.",
-    version="1.0.0"
+    description="Enterprise API with lazy-loaded AI models.",
+    version="1.0.0",
+    lifespan=lifespan
 )
-
-# Load global AI embedder & FAISS Vector DB
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
-faiss_engine = FaissSearchEngine()
 
 @app.post("/api/v1/jobs", status_code=201)
 def create_job_description(
@@ -59,6 +75,7 @@ async def screen_resumes(
     files: List[UploadFile] = File(...),
     db: Session = Depends(get_db)
 ):
+    global embedder, faiss_engine
     job = db.query(JobDescription).filter(JobDescription.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job Description not found")
@@ -71,7 +88,6 @@ async def screen_resumes(
         parsed_meta = ResumeParser.parse_file(contents, file.filename)
         cand_embedding = embedder.encode(parsed_meta["raw_text"])
         
-        # Persist Candidate record
         candidate = Candidate(
             full_name=parsed_meta["name"],
             email=parsed_meta["email"],
@@ -86,7 +102,6 @@ async def screen_resumes(
         db.commit()
         db.refresh(candidate)
 
-        # Execute Multi-Factor Ranking Logic
         job_data = {
             "required_skills": job.required_skills,
             "preferred_skills": job.preferred_skills,
@@ -96,17 +111,14 @@ async def screen_resumes(
             parsed_meta, job_data, cand_embedding, job_embedding
         )
         
-        # Add to FAISS Vector DB for semantic search capabilities
         faiss_engine.add_vector(candidate.id, cand_embedding)
         
-        # Generate custom Interview Questions based on AI analysis
         interview_qs = InterviewQuestionGenerator.generate_questions(
             eval_result["missing_skills"], 
             eval_result["matched_skills"]
         )
         eval_result["interview_questions"] = interview_qs
 
-        # Store match score record
         match = CandidateMatch(
             job_id=job.id,
             candidate_id=candidate.id,
@@ -125,10 +137,8 @@ async def screen_resumes(
 
         results.append(eval_result)
 
-    # Sort descending by final suitability score
     results.sort(key=lambda x: x["score"], reverse=True)
     
-    # Simulate Emailing the top candidate (if any scored >= 80%)
     if results and results[0]["score"] >= 80.0:
         NotificationManager.send_shortlist_email(
             candidate_email=results[0].get("email", "candidate@domain.com"),
@@ -140,9 +150,6 @@ async def screen_resumes(
 
 @app.post("/api/v1/export/excel")
 async def export_to_excel(data: dict):
-    """
-    Accepts JSON list of shortlisted candidates and returns a downloadable Excel file.
-    """
     candidates = data.get("candidates", [])
     if not candidates:
         raise HTTPException(status_code=400, detail="No candidates provided for export")
@@ -155,12 +162,9 @@ async def export_to_excel(data: dict):
         headers={"Content-Disposition": "attachment; filename=shortlist_report.xlsx"}
     )
 
-
-# --- Serve Frontend UI ---
 os.makedirs("frontend", exist_ok=True)
 app.mount("/static", StaticFiles(directory="frontend"), name="static")
 
 @app.get("/", include_in_schema=False)
 async def serve_frontend():
-    """Serves the beautiful Recruiter Dashboard when you visit the root URL"""
     return FileResponse("frontend/index.html")

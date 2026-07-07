@@ -1,0 +1,23 @@
+{
+  "sample_job_descriptions": [
+    {
+      "title": "Senior AI Backend Engineer",
+      "required_skills": "python, fastapi, sql, machine learning",
+      "preferred_skills": "docker, kubernetes, faiss",
+      "min_experience_years": 4.0,
+      "raw_text": "We are looking for a Senior Backend Engineer to build scalable AI microservices. The ideal candidate has strong experience with Python 3, building RESTful APIs using FastAPI, and designing PostgreSQL database schemas. You should have at least 4 years of software engineering experience. Familiarity with NLP, Machine Learning, and vector databases like FAISS is highly desired. Containerization using Docker and orchestration with Kubernetes will be considered a strong plus. You must hold a Bachelor's degree in Computer Science or a related field."
+    }
+  ],
+  "sample_resumes_to_create_as_pdfs": [
+    {
+      "filename": "alice_smith_resume.pdf",
+      "expected_score": "High (85%+)",
+      "raw_text": "ALICE SMITH\nalice.smith@email.com | (555) 123-4567\n\nEDUCATION\nBachelor of Science in Computer Science, MIT - 2018\n\nEXPERIENCE\nSenior Software Engineer (2019 - Present)\n- Developed robust backend architectures using Python and FastAPI.\n- Designed complex SQL queries for PostgreSQL databases.\n- Deployed containerized applications using Docker and Kubernetes.\n- Implemented semantic search features using FAISS and machine learning embeddings.\n\nSKILLS\nPython, FastAPI, Django, SQL, Docker, Kubernetes, Machine Learning, FAISS, Git"
+    },
+    {
+      "filename": "bob_jones_resume.pdf",
+      "expected_score": "Low (40%-)",
+      "raw_text": "BOB JONES\nbob.jones@email.com | (555) 987-6543\n\nEDUCATION\nHigh School Diploma, Tech Academy - 2021\n\nEXPERIENCE\nJunior Web Developer (2022 - Present)\n- Built interactive frontend user interfaces using React and Node.js.\n- Managed styling with TailwindCSS and HTML.\n- Wrote basic scripts for data entry.\n\nSKILLS\nJavaScript, React, Node.js, HTML, CSS, TailwindCSS, MongoDB"
+    }
+  ]
+}

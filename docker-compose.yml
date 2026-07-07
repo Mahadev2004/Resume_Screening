@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: resume_pg_db
+    environment:
+      POSTGRES_USER: ai_recruiter
+      POSTGRES_PASSWORD: SecurePassword123!
+      POSTGRES_DB: resume_screening
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_recruiter -d resume_screening"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: resume_fastapi
+    environment:
+      DATABASE_URL: postgresql://ai_recruiter:SecurePassword123!@db:5432/resume_screening
+      MODEL_NAME: all-MiniLM-L6-v2
+      FAISS_INDEX_PATH: /app/uploads/faiss_index.bin
+      UPLOAD_DIR: /app/uploads
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./uploads:/app/uploads
+
+volumes:
+  pg_data:

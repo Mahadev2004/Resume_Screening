@@ -15,6 +15,9 @@ from fastapi.responses import FileResponse, Response
 from app.utils.export import ExportService
 from app.notifications.manager import InterviewQuestionGenerator, NotificationManager
 from app.embeddings.faiss_index import FaissSearchEngine
+import gc
+# After your models finish loading
+gc.collect()
 
 # Create tables on startup
 Base.metadata.create_all(bind=engine)
